@@ -54,7 +54,31 @@ export async function POST(req: NextRequest) {
       console.error('Exception updating user verification status:', e)
     }
 
-    return NextResponse.json({ success: true, data })
+    // Fetch role using service-role client to avoid RLS restrictions in the browser
+    try {
+      const userId = data?.user?.id
+      const idMatch = userId ? { field: 'id', value: userId } : { field: 'email', value: email }
+      const { data: profileData, error: profileError } = await supabase
+        .from('users')
+        .select('role')
+        .eq(idMatch.field, idMatch.value)
+        .maybeSingle()
+
+      if (profileError) {
+        console.error('Error fetching user role after verification:', profileError)
+      }
+
+      // Normalize role to avoid casing/whitespace mismatches
+      const rawRole = profileData?.role ?? null
+      const role = typeof rawRole === 'string' ? rawRole.trim().toLowerCase() : rawRole
+
+      console.log('verify-otp: returning role for redirect', { role, userId: idMatch.value })
+
+      return NextResponse.json({ success: true, data, role })
+    } catch (e) {
+      console.error('Error fetching role after verification:', e)
+      return NextResponse.json({ success: true, data, role: null })
+    }
   } catch (err) {
     return NextResponse.json(
       { error: 'Invalid request' },

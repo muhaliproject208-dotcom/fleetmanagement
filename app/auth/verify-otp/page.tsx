@@ -30,31 +30,21 @@ function VerifyOTPContent() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, token: otp }),
       });
-
-      const data = await response.json();
+      const body = await response.json()
 
       if (response.ok) {
-        // After successful OTP verification, get user role and redirect appropriately
-        const supabase = getSupabaseClient();
-        const { data: { user } } = await supabase.auth.getUser();
-        
-        if (user) {
-          // Get user profile to determine role
-          const { data: profile } = await supabase
-            .from('users')
-            .select('role')
-            .eq('id', user.id)
-            .maybeSingle();
+        // Use role returned by server (queried with service role) to redirect
+        const rawRole: string | null = body?.role ?? null
+        const roleFromServer = rawRole ? rawRole.toString().trim().toLowerCase() : null
 
-          // Redirect to role-specific dashboard
-          const dashboardRoute = ROLE_DASHBOARD_ROUTES[profile?.role as keyof typeof ROLE_DASHBOARD_ROUTES];
-          const redirectUrl = dashboardRoute || '/dashboard/driver'; // fallback to driver
-          router.push(redirectUrl);
-        } else {
-          router.push('/dashboard/driver'); // fallback
-        }
+        const dashboardRoute = roleFromServer
+          ? ROLE_DASHBOARD_ROUTES[roleFromServer as keyof typeof ROLE_DASHBOARD_ROUTES]
+          : null
+
+        const redirectUrl = dashboardRoute || '/dashboard/driver'
+        router.push(redirectUrl)
       } else {
-        setError(data.error || 'Invalid OTP');
+        setError(body.error || 'Invalid OTP')
       }
     } catch (err) {
       setError('Failed to verify OTP');
