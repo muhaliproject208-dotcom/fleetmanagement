@@ -2,7 +2,7 @@
 
 import { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ROLE_DASHBOARD_ROUTES } from '@/lib/constants/roles';
+import { ROLE_DASHBOARD_ROUTES, getDashboardRoute } from '@/lib/constants/roles';
 import { getSupabaseClient } from '@/lib/supabase-client';
 
 // Ensure this page is fully dynamic (no prerendering)
@@ -37,12 +37,13 @@ function VerifyOTPContent() {
         const rawRole: string | null = body?.role ?? null
         const roleFromServer = rawRole ? rawRole.toString().trim().toLowerCase() : null
 
-        const dashboardRoute = roleFromServer
-          ? ROLE_DASHBOARD_ROUTES[roleFromServer as keyof typeof ROLE_DASHBOARD_ROUTES]
-          : null
-
-        const redirectUrl = dashboardRoute || '/dashboard/driver'
-        router.push(redirectUrl)
+        if (roleFromServer) {
+          const redirectUrl = getDashboardRoute(roleFromServer)
+          router.push(redirectUrl)
+        } else {
+          // Role missing — send user to setup to choose their role instead of defaulting to driver
+          router.push(`/auth/setup?email=${encodeURIComponent(email)}`)
+        }
       } else {
         setError(body.error || 'Invalid OTP')
       }

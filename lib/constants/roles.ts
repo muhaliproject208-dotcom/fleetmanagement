@@ -36,3 +36,10 @@ export const SIGNUP_ROLES = [
 ] as const
 
 export type Role = typeof ROLES[keyof typeof ROLES]
+
+// Helper: normalize role string and return dashboard route with safe fallback
+export function getDashboardRoute(role?: string) {
+  const normalized = (role || '').toString().trim().toLowerCase()
+  if (!normalized) return ROLE_DASHBOARD_ROUTES[ROLES.DRIVER]
+  return ROLE_DASHBOARD_ROUTES[normalized] || ROLE_DASHBOARD_ROUTES[ROLES.DRIVER]
+}

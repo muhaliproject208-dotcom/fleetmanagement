@@ -388,11 +388,11 @@ export default function DriverDashboard() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Welcome Section */}
         <div className="mb-8">
-          <div className="bg-gradient-to-r from-green-600 to-emerald-600 rounded-2xl p-8 text-white shadow-xl">
+          <div className="bg-linear-to-r from-green-600 to-emerald-600 rounded-2xl p-8 text-white shadow-xl">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-6">
                 {/* Avatar Section - Far Left */}
-                <div className="flex-shrink-0">
+                <div className="shrink-0">
                   <AvatarUpload
                     currentAvatar={userProfile?.avatar_url}
                     userId={user?.id || ''}

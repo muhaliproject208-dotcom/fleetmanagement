@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Mail, CheckCircle, AlertCircle, Key, Loader2 } from 'lucide-react'
-import { ROLE_DASHBOARD_ROUTES } from '@/lib/constants/roles'
+import { ROLE_DASHBOARD_ROUTES, getDashboardRoute } from '@/lib/constants/roles'
 import { getSupabaseClient } from '@/lib/supabase-client'
 
 export const dynamic = 'force-dynamic'
@@ -53,12 +53,12 @@ function CheckEmailContent() {
             .eq('id', user.id)
             .maybeSingle()
 
-          // Redirect to role-specific dashboard
-          const dashboardRoute = ROLE_DASHBOARD_ROUTES[profile?.role as keyof typeof ROLE_DASHBOARD_ROUTES]
-          const redirectUrl = dashboardRoute || '/dashboard/driver'
+          // Redirect to role-specific dashboard (normalize role)
+          const redirectUrl = getDashboardRoute(profile?.role)
           router.push(redirectUrl)
         } else {
-          router.push('/dashboard/driver')
+          // No user found — don't default to driver, redirect to setup to choose role
+          router.push(`/auth/setup?email=${encodeURIComponent(email)}`)
         }
       } else {
         setOtpStatus('invalid')

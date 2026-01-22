@@ -1,7 +1,7 @@
 import { getSupabaseServer } from "@/lib/supabase-server"
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from "next/server"
-import { ROLE_DASHBOARD_ROUTES } from "@/lib/constants/roles"
+import { ROLE_DASHBOARD_ROUTES, getDashboardRoute } from "@/lib/constants/roles"
 
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url)
@@ -140,8 +140,7 @@ export async function GET(request: NextRequest) {
                     .single()
                   
                   if (existingProfile) {
-                    const dashboardRoute = ROLE_DASHBOARD_ROUTES[existingProfile.role as keyof typeof ROLE_DASHBOARD_ROUTES]
-                    const redirectUrl = dashboardRoute || '/dashboard/driver'
+                    const redirectUrl = getDashboardRoute(existingProfile.role)
                     return NextResponse.redirect(`${requestUrl.origin}${redirectUrl}`)
                   }
                 }
@@ -220,8 +219,7 @@ export async function GET(request: NextRequest) {
                 
                 if (existingProfile && !fetchError) {
                   console.log("Found existing profile:", existingProfile)
-                  const dashboardRoute = ROLE_DASHBOARD_ROUTES[existingProfile.role as keyof typeof ROLE_DASHBOARD_ROUTES]
-                  const redirectUrl = dashboardRoute || '/dashboard/driver'
+                  const redirectUrl = getDashboardRoute(existingProfile.role)
                   return NextResponse.redirect(`${requestUrl.origin}${redirectUrl}`)
                 }
               }
@@ -249,8 +247,7 @@ export async function GET(request: NextRequest) {
             console.log("User profile created successfully from metadata")
             
             // Redirect to role-specific dashboard
-            const dashboardRoute = ROLE_DASHBOARD_ROUTES[role as keyof typeof ROLE_DASHBOARD_ROUTES]
-            const redirectUrl = dashboardRoute || '/dashboard/driver'
+            const redirectUrl = getDashboardRoute(role)
             return NextResponse.redirect(`${requestUrl.origin}${redirectUrl}`)
           } else {
             // This is likely a database access issue, redirect to auth with error
@@ -261,9 +258,8 @@ export async function GET(request: NextRequest) {
 
         console.log("User profile found:", profile)
         
-        // Redirect to role-specific dashboard
-        const dashboardRoute = ROLE_DASHBOARD_ROUTES[profile?.role as keyof typeof ROLE_DASHBOARD_ROUTES]
-        const redirectUrl = dashboardRoute || '/auth'
+        // Redirect to role-specific dashboard (normalize role)
+        const redirectUrl = getDashboardRoute(profile?.role)
         console.log("Redirecting to:", redirectUrl)
         return NextResponse.redirect(`${requestUrl.origin}${redirectUrl}`)
       }

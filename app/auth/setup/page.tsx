@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { getSupabaseClient } from "@/lib/supabase-client"
-import { ROLE_DASHBOARD_ROUTES } from "@/lib/constants/roles"
+import { ROLE_DASHBOARD_ROUTES, getDashboardRoute } from "@/lib/constants/roles"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -119,8 +119,8 @@ function AuthSetupContent() {
         description: "Your account has been configured successfully.",
       })
 
-      // Redirect based on role using centralized routing
-      const redirectUrl = ROLE_DASHBOARD_ROUTES[formData.role] || '/auth'
+      // Redirect based on role using centralized routing (normalize role)
+      const redirectUrl = getDashboardRoute(formData.role) || '/auth'
 
       router.push(redirectUrl)
     } catch (err) {

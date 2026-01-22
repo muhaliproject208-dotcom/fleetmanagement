@@ -6,7 +6,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { getSupabaseClient } from '@/lib/supabase-client'
 import { isSupabaseConfigured } from '@/lib/supabase-client'
-import { ROLE_DASHBOARD_ROUTES } from '@/lib/constants/roles'
+import { ROLE_DASHBOARD_ROUTES, getDashboardRoute } from '@/lib/constants/roles'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -261,9 +261,8 @@ export default function AuthPage() {
               .select('role')
               .eq('id', verifyData.user.id)
               .maybeSingle();
-            
-            const dashboardRoute = ROLE_DASHBOARD_ROUTES[profile?.role as keyof typeof ROLE_DASHBOARD_ROUTES];
-            const redirectUrl = dashboardRoute || '/dashboard/driver'; // fallback to driver
+
+            const redirectUrl = getDashboardRoute(profile?.role)
             router.push(redirectUrl)
             return
           }
@@ -280,9 +279,9 @@ export default function AuthPage() {
           })
 
           // Redirect to role-specific dashboard
-          const dashboardRoute = ROLE_DASHBOARD_ROUTES[userDetails?.role as keyof typeof ROLE_DASHBOARD_ROUTES]
-          if (dashboardRoute) {
-            router.replace(dashboardRoute)
+          const redirectUrl = getDashboardRoute(userDetails?.role)
+          if (redirectUrl) {
+            router.replace(redirectUrl)
           } else {
             setErrors({ login: 'User role not found. Please contact support.' })
           }
@@ -315,8 +314,15 @@ export default function AuthPage() {
         // Handle case where query succeeds but returns no data
         if (!profile && !profileError) {
           console.log('No profile found for user, treating as missing profile')
-          // User exists in auth but not in users table, create user profile with default role
+          // User exists in auth but not in users table, create user profile from metadata if available
           console.log('Creating user profile for existing auth user...')
+          const roleFromMeta = authData.user.user_metadata?.role || (typeof window !== 'undefined' ? window.localStorage.getItem('signup_role') : null)
+          if (!roleFromMeta) {
+            console.warn('No role metadata found for user; redirecting to setup to choose role', { userId: authData.user.id })
+            router.replace(`/auth/setup?user_id=${authData.user.id}`)
+            return
+          }
+
           const response = await fetch('/api/create-user', {
             method: 'POST',
             headers: {
@@ -325,7 +331,7 @@ export default function AuthPage() {
             body: JSON.stringify({
               userId: authData.user.id,
               email: authData.user.email,
-              role: 'driver', // Default role for existing users
+              role: roleFromMeta,
               fullName: authData.user.user_metadata?.full_name || authData.user.email?.split('@')[0],
               isVerified: true, // Assume existing users are verified
             }),
@@ -360,6 +366,13 @@ export default function AuthPage() {
             console.log('Empty error object, 500 error, or RLS recursion detected - treating as missing profile')
             // User exists in auth but can't access users table due to RLS, create profile via API
             console.log('Creating user profile via API due to RLS restrictions...')
+            const roleFromMeta = authData.user.user_metadata?.role || (typeof window !== 'undefined' ? window.localStorage.getItem('signup_role') : null)
+            if (!roleFromMeta) {
+              console.warn('No role metadata found for user (RLS case); redirecting to setup to choose role', { userId: authData.user.id })
+              router.replace(`/auth/setup?user_id=${authData.user.id}`)
+              return
+            }
+
             const response = await fetch('/api/create-user', {
               method: 'POST',
               headers: {
@@ -368,15 +381,15 @@ export default function AuthPage() {
               body: JSON.stringify({
                 userId: authData.user.id,
                 email: authData.user.email,
-                role: 'driver', // Default role for existing users
+                role: roleFromMeta,
                 fullName: authData.user.user_metadata?.full_name || authData.user.email?.split('@')[0],
                 isVerified: true, // Assume existing users are verified
               }),
             })
 
             if (response.ok) {
-              // Redirect to default driver dashboard
-              const dashboardRoute = ROLE_DASHBOARD_ROUTES['driver']
+              // Redirect to role-specific dashboard
+              const dashboardRoute = getDashboardRoute(roleFromMeta || 'driver')
               if (dashboardRoute) {
                 router.replace(dashboardRoute)
               } else {
@@ -386,7 +399,7 @@ export default function AuthPage() {
             } else if (response.status === 409) {
               // 409 Conflict means user already exists - this is actually success
               console.log('User profile already exists (409), proceeding to dashboard')
-              const dashboardRoute = ROLE_DASHBOARD_ROUTES['driver']
+              const dashboardRoute = getDashboardRoute(roleFromMeta || 'driver')
               if (dashboardRoute) {
                 router.replace(dashboardRoute)
               } else {
@@ -414,8 +427,15 @@ export default function AuthPage() {
           
           // Handle different types of database errors
           if (profileError.code === 'PGRST116' || profileError.message?.includes('No rows found')) {
-            // User exists in auth but not in users table, create user profile with default role
+            // User exists in auth but not in users table, create user profile from metadata if available
             console.log('Creating user profile for existing auth user...')
+            const roleFromMeta = authData.user.user_metadata?.role || (typeof window !== 'undefined' ? window.localStorage.getItem('signup_role') : null)
+            if (!roleFromMeta) {
+              console.warn('No role metadata found for user; redirecting to setup to choose role', { userId: authData.user.id })
+              router.replace(`/auth/setup?user_id=${authData.user.id}`)
+              return
+            }
+
             const response = await fetch('/api/create-user', {
               method: 'POST',
               headers: {
@@ -424,15 +444,15 @@ export default function AuthPage() {
               body: JSON.stringify({
                 userId: authData.user.id,
                 email: authData.user.email,
-                role: 'driver', // Default role for existing users
+                role: roleFromMeta,
                 fullName: authData.user.user_metadata?.full_name || authData.user.email?.split('@')[0],
                 isVerified: true, // Assume existing users are verified
               }),
             })
 
             if (response.ok) {
-              // Redirect to default driver dashboard
-              const dashboardRoute = ROLE_DASHBOARD_ROUTES['driver']
+              // Redirect to role-specific dashboard
+              const dashboardRoute = getDashboardRoute(roleFromMeta || 'driver')
               if (dashboardRoute) {
                 router.replace(dashboardRoute)
               } else {
@@ -457,13 +477,34 @@ export default function AuthPage() {
           
           // Check if user is verified
           if (!profile?.is_verified) {
-            setErrors({ login: 'Your email is not verified. Please check your inbox for OTP.' })
-            return
+            // If the Supabase auth user shows email_confirmed_at, try to sync that to the users table
+            const authConfirmed = authData.user?.email_confirmed_at
+            if (authConfirmed) {
+              try {
+                const resp = await fetch('/api/auth/mark-verified', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ userId: authData.user.id, email_confirmed_at: authConfirmed })
+                })
+
+                if (resp.ok) {
+                  console.log('Synchronized verification status from auth to users table')
+                  // proceed as verified
+                } else {
+                  console.warn('Failed to synchronize verification status, but allowing login if auth indicates verified', await resp.text())
+                }
+              } catch (e) {
+                console.error('Error calling mark-verified endpoint:', e)
+              }
+            } else {
+              setErrors({ login: 'Your email is not verified. Please check your inbox for OTP.' })
+              return
+            }
           }
           
-          // Redirect based on role
+          // Redirect based on role (normalize role and use helper)
           const role = profile?.role || 'driver' // Default fallback
-          const dashboardRoute = ROLE_DASHBOARD_ROUTES[role as keyof typeof ROLE_DASHBOARD_ROUTES] || '/dashboard'
+          const dashboardRoute = getDashboardRoute(role) || '/dashboard'
           
           if (!dashboardRoute) {
             setErrors({ login: 'Invalid user role. Please contact support.' })
